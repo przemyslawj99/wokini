@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wokini — Kuchnia azjatycka online i na miejscu</title>
+    <meta
+      name="description"
+      content="Wokini: nowoczesna kuchnia azjatycka. Zamów online, odbierz na miejscu lub zamów z dowozem."
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <meta property="og:title" content="Wokini — kuchnia azjatycka" />
+    <meta
+      property="og:description"
+      content="Świeże składniki, szybka dostawa, wygodne zamówienia online."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://wokini.pl/" />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="script.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Przejdź do treści</a>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a class="brand" href="#" aria-label="Wokini - strona główna">
+          <span class="brand__logo" aria-hidden="true">🍜</span>
+          <span>Wokini</span>
+        </a>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="main-nav">Menu</button>
+        <nav id="main-nav" class="main-nav" aria-label="Nawigacja główna">
+          <a href="#menu">Menu</a>
+          <a href="#o-nas">O nas</a>
+          <a href="#zamowienia">Zamówienia</a>
+          <a href="#kontakt">Kontakt</a>
+          <a class="btn btn--small" href="#zamowienia">Zamów online</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="content">
+      <section class="hero">
+        <div class="container hero__grid">
+          <div>
+            <p class="eyebrow">Nowoczesna strona • szybkie działanie • zgodność prawna</p>
+            <h1>Wokini w nowej odsłonie</h1>
+            <p class="lead">
+              Przejrzysty układ, responsywny design i jasna informacja o cookies oraz prywatności.
+              Strona przygotowana pod aktualne standardy UX, SEO i dostępności.
+            </p>
+            <div class="actions">
+              <a class="btn" href="#zamowienia">Zamów teraz</a>
+              <a class="btn btn--ghost" href="#polityki">Zobacz polityki</a>
+            </div>
+          </div>
+          <aside class="card highlights" aria-label="Najważniejsze informacje">
+            <h2>Dlaczego ta wersja?</h2>
+            <ul>
+              <li>⚡ Lepsza wydajność na mobile i desktop</li>
+              <li>♿ Lepsza dostępność (kontrast, klawiatura, semantyka)</li>
+              <li>🔒 Cookies i prywatność zgodne z RODO/ePrivacy*</li>
+              <li>📈 Przygotowanie pod analitykę opartą o zgodę użytkownika</li>
+            </ul>
+            <p class="tiny">*Pamiętaj o uzupełnieniu danych firmy i podstaw prawnych.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="menu" class="section">
+        <div class="container">
+          <h2>Przykładowe pozycje</h2>
+          <div class="cards">
+            <article class="card">
+              <h3>Pad Thai</h3>
+              <p>Makaron ryżowy, tofu lub kurczak, kiełki, orzeszki, limonka.</p>
+            </article>
+            <article class="card">
+              <h3>Wok Chili Beef</h3>
+              <p>Wołowina, warzywa stir-fry, autorski sos chili-garlic.</p>
+            </article>
+            <article class="card">
+              <h3>Ramen Miso</h3>
+              <p>Bulion miso, jajko ajitsuke, nori, dymka i chrupiące warzywa.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="zamowienia" class="section section--alt">
+        <div class="container">
+          <h2>Zamawianie online</h2>
+          <p>
+            Zadbaj o prostą ścieżkę zakupową: wybór dania, adres, płatność i śledzenie zamówienia.
+            Sekcja gotowa do integracji z systemem zamówień i płatności.
+          </p>
+          <a class="btn" href="#">Przejdź do systemu zamówień</a>
+        </div>
+      </section>
+
+      <section id="o-nas" class="section">
+        <div class="container">
+          <h2>O nas</h2>
+          <p>
+            Wokini to kuchnia inspirowana smakami Azji. Stawiamy na świeże składniki i szybkie
+            przygotowanie dań.
+          </p>
+        </div>
+      </section>
+
+      <section id="kontakt" class="section section--alt">
+        <div class="container">
+          <h2>Kontakt</h2>
+          <p>Adres: ul. Przykładowa 10, 00-000 Miasto</p>
+          <p>Telefon: +48 000 000 000</p>
+          <p>E-mail: kontakt@wokini.pl</p>
+          <p>Godziny: pon.-niedz. 11:00–22:00</p>
+        </div>
+      </section>
+
+      <section id="polityki" class="section">
+        <div class="container">
+          <h2>Informacje prawne</h2>
+          <ul class="legal-links">
+            <li><a href="privacy.html">Polityka prywatności</a></li>
+            <li><a href="cookies.html">Polityka cookies</a></li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p>© <span id="year"></span> Wokini. Wszelkie prawa zastrzeżone.</p>
+        <button id="cookie-settings" class="link-button">Ustawienia cookies</button>
+      </div>
+    </footer>
+
+    <div class="cookie-banner" id="cookie-banner" role="dialog" aria-live="polite" aria-label="Ustawienia plików cookies" hidden>
+      <div class="cookie-banner__content">
+        <h2>Dbamy o Twoją prywatność</h2>
+        <p>
+          Używamy niezbędnych cookies do działania strony. Za Twoją zgodą użyjemy też cookies
+          analitycznych i marketingowych. Możesz zmienić decyzję w dowolnym momencie.
+        </p>
+        <div class="cookie-banner__options">
+          <label><input type="checkbox" checked disabled /> Niezbędne (zawsze aktywne)</label>
+          <label><input type="checkbox" id="analytics-consent" /> Analityczne</label>
+          <label><input type="checkbox" id="marketing-consent" /> Marketingowe</label>
+        </div>
+        <div class="actions">
+          <button class="btn" id="accept-all">Akceptuj wszystkie</button>
+          <button class="btn btn--ghost" id="save-preferences">Zapisz wybór</button>
+          <button class="btn btn--ghost" id="reject-optional">Odrzuć opcjonalne</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
