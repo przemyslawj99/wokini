@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - chatgpt-kurs-v060-build
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
