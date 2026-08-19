@@ -1,4 +1,4 @@
-name: Export Kurs na Horyzont v0.6.3 source
+name: Build Kurs na Horyzont v0.6.4
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  export-source:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,40 +18,138 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Reconstruct v0.6.0 base
+      - name: Record run id
+        run: |
+          mkdir -p kurs-v064
+          printf '%s\n' "${{ github.run_id }}" > kurs-v064/latest_run.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kurs-v064/latest_run.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Record v0.6.4 build run [skip ci]"
+            git push origin HEAD:chatgpt-kurs-v060-build
+          fi
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Reconstruct v0.6.3 source
         run: |
           cat kurs-v060/chunks/chunk_* > project.b64
           base64 -d project.b64 > project.zip
           rm -rf build-project
           mkdir build-project
           unzip -q project.zip -d build-project
-
-      - name: Apply v0.6.3 period-ships patch
-        run: |
           cat kurs-v060/v063-patch/chunk_* > v063.patch.gz.b64
           base64 -d v063.patch.gz.b64 > v063.patch.gz
           gzip -dc v063.patch.gz > v063.patch
           cd build-project
           patch -p1 < ../v063.patch
 
-      - name: Export reconstructed source to branch
+      - name: Apply v0.6.4 collision and model improvements
         run: |
-          rm -rf kurs-v063-src
-          mkdir -p kurs-v063-src/app/src/main/java/pl/kursnahoryzont/game
-          mkdir -p kurs-v063-src/app/src/main/res/drawable
-          cp build-project/settings.gradle kurs-v063-src/
-          cp build-project/build.gradle kurs-v063-src/
-          cp build-project/debug.keystore kurs-v063-src/
-          cp build-project/app/build.gradle kurs-v063-src/app/
-          cp build-project/app/src/main/AndroidManifest.xml kurs-v063-src/app/src/main/
-          cp build-project/app/src/main/java/pl/kursnahoryzont/game/*.java kurs-v063-src/app/src/main/java/pl/kursnahoryzont/game/
-          cp build-project/app/src/main/res/drawable/ic_launcher.xml kurs-v063-src/app/src/main/res/drawable/
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add kurs-v063-src
-          if git diff --cached --quiet; then
-            echo "No source changes to commit"
-          else
-            git commit -m "Export reconstructed v0.6.3 source [skip ci]"
-            git push origin HEAD:chatgpt-kurs-v060-build
-          fi
+          python3 kurs-v064/apply_v064.py
+          grep -n "versionCode\|versionName" build-project/app/build.gradle
+          grep -n "deckHalfWidthForCollision\|helmZ()\|gangwayX()\|insideInteriorObstacle" build-project/app/src/main/java/pl/kursnahoryzont/game/GameState.java | head -n 30
+          grep -n "drawPeriodRailings\|drawPeriodRudder\|drawWheel\|drawFrigateCabin" build-project/app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 40
+
+      - name: Build signed release APK
+        working-directory: build-project
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify APK
+        working-directory: build-project
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 8 | tee apk_badging.txt
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK" | tee apk_signature.txt
+          $ANDROID_HOME/build-tools/35.0.0/zipalign -c -v 4 "$APK" | tail -n 4 | tee zipalign.txt
+          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.4.apk
+          sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.4.apk | tee apk_sha256.txt
+
+      - name: Create build report
+        working-directory: build-project
+        run: |
+          CERT=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs Kurs_na_Horyzont_Realme_C67_v0.6.4.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1)
+          SHA=$(sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.4.apk | awk '{print $1}')
+          cat > Kurs_na_Horyzont_v0.6.4_BUILD_REPORT.txt <<EOF
+          Kurs na Horyzont — v0.6.4 BUILD REPORT
+          versionName=0.6.4
+          versionCode=27
+          package=pl.kursnahoryzont.game
+          minSdkVersion=23
+          targetSdkVersion=35
+          APK=Kurs_na_Horyzont_Realme_C67_v0.6.4.apk
+          APK_SHA256=$SHA
+
+          Poprawki kolizji i poruszania:
+          - Dodano osobne granice pokładu dla slupa, brygu i fregaty zgodne z szerokością ich kadłubów.
+          - Usunięto używanie wąskiej mapy kolizji slupa na brygu i fregacie.
+          - Dodano osobne przeszkody pokładowe zależne od typu statku.
+          - Dodano automatyczne odzyskiwanie bezpiecznej pozycji, gdy stary zapis umieści gracza wewnątrz nowej geometrii.
+          - Po puszczeniu koła gracz jest odkładany w wolne miejsce obok steru.
+          - Punkty interakcji steru, trapu, cum i kotwicy są teraz zależne od rozmiaru statku.
+          - Pokłady działowe mają kolizje dział po bokach, ale zachowują wolny centralny korytarz.
+          - Pokład mieszkalny fregaty ma kolizje hamaków i stołu z zachowanym przejściem.
+
+          Poprawki modeli statków:
+          - Fregata i bryg nie renderują już sloopowego transomu i steru wewnątrz swoich kadłubów.
+          - Dodano osobne stery na rzeczywistych rufach brygu i fregaty.
+          - Relingi brygu i fregaty biegną teraz po rzeczywistych krawędziach ich pokładów i mają przerwy przy trapach.
+          - Fregata dostała otwarty quarterdeck; duża blokowa nadbudówka została zastąpiona niską zejściówką i świetlikiem.
+          - Bryg dostał niższą zejściówkę zamiast wysokiej blokowej kabiny.
+          - Koło sterowe ma osobną pozycję i skalę dla każdego statku; na fregacie stoi na wolnym quarterdecku.
+          - Przeniesiono wyposażenie rufowe z osi przejścia na boki.
+          - Dodano schodki wizualne między głównym pokładem a quarterdeckiem/forecastle na brygu i fregacie.
+          - Kamera podczas chodzenia zmienia wysokość na podniesionych pokładach.
+          - Kamera za sterem korzysta z rzeczywistej pozycji koła danego statku.
+          - Windlass, trapy, knaga cumownicza i latarnie rufowe są rozmieszczane zależnie od klasy statku.
+
+          Build i podpis:
+          - Gradle assembleRelease: BUILD SUCCESSFUL.
+          - APK v1 signature=true.
+          - APK v2 signature=true.
+          - zipalign=OK.
+          - Certyfikat SHA-256=$CERT
+          - Test na fizycznym Realme C67 nie został wykonany w środowisku buildowym.
+          EOF
+          sed -i 's/^          //' Kurs_na_Horyzont_v0.6.4_BUILD_REPORT.txt
+
+      - name: Package sources
+        run: |
+          rm -rf source-out
+          mkdir source-out
+          cp -a build-project/. source-out/
+          rm -rf source-out/.gradle source-out/app/build source-out/build
+          rm -f source-out/Kurs_na_Horyzont_Realme_C67_v0.6.4.apk
+          zip -qr Kurs_na_Horyzont_zrodla_v0.6.4.zip source-out
+
+      - name: Upload APK and report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kurs_na_Horyzont_Realme_C67_v0.6.4
+          path: |
+            build-project/Kurs_na_Horyzont_Realme_C67_v0.6.4.apk
+            build-project/Kurs_na_Horyzont_v0.6.4_BUILD_REPORT.txt
+          if-no-files-found: error
+
+      - name: Upload sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kurs_na_Horyzont_zrodla_v0.6.4
+          path: Kurs_na_Horyzont_zrodla_v0.6.4.zip
+          if-no-files-found: error
