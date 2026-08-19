@@ -1,9 +1,9 @@
-name: Build Kurs na Horyzont v0.6.0
+name: Build Kurs na Horyzont v0.6.3
 
 on:
   push:
     branches:
-      - chatgpt-kurs-v060-build
+      - chatgpt-kurs-v060-build2
   pull_request:
     branches:
       - main
@@ -33,7 +33,7 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Reconstruct and unpack project
+      - name: Reconstruct v0.6.0 base
         run: |
           cat kurs-v060/chunks/chunk_* > project.b64
           base64 -d project.b64 > project.zip
@@ -41,6 +41,16 @@ jobs:
           rm -rf build-project
           mkdir build-project
           unzip -q project.zip -d build-project
+
+      - name: Apply v0.6.3 period-ships patch
+        run: |
+          cat kurs-v060/v063-patch/chunk_* > v063.patch.gz.b64
+          base64 -d v063.patch.gz.b64 > v063.patch.gz
+          gzip -dc v063.patch.gz > v063.patch
+          cd build-project
+          patch -p1 < ../v063.patch
+          grep -n "versionCode\|versionName" app/build.gradle
+          grep -n "interiorDeckLevel\|drawFrigateGunDeckInterior\|drawBrigGunDeckInterior\|drawFrigateCannons\|drawBrigCannons" app/src/main/java/pl/kursnahoryzont/game/GameState.java app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 30
 
       - name: Build signed release APK
         working-directory: build-project
@@ -52,11 +62,11 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 8
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"
-          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.0.apk
+          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_Realme_C67_v0.6.0
-          path: build-project/Kurs_na_Horyzont_Realme_C67_v0.6.0.apk
+          name: Kurs_na_Horyzont_Realme_C67_v0.6.3
+          path: build-project/Kurs_na_Horyzont_Realme_C67_v0.6.3.apk
           if-no-files-found: error
