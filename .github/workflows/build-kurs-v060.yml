@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - chatgpt-kurs-v060-build
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -37,7 +34,6 @@ jobs:
         run: |
           cat kurs-v060/chunks/chunk_* > project.b64
           base64 -d project.b64 > project.zip
-          unzip -t project.zip
           rm -rf build-project
           mkdir build-project
           unzip -q project.zip -d build-project
@@ -49,8 +45,6 @@ jobs:
           gzip -dc v063.patch.gz > v063.patch
           cd build-project
           patch -p1 < ../v063.patch
-          grep -n "versionCode\|versionName" app/build.gradle
-          grep -n "interiorDeckLevel\|drawFrigateGunDeckInterior\|drawBrigGunDeckInterior\|drawFrigateCannons\|drawBrigCannons" app/src/main/java/pl/kursnahoryzont/game/GameState.java app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 30
 
       - name: Build signed release APK
         working-directory: build-project
@@ -64,9 +58,24 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"
           cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.3.apk
 
+      - name: Package reconstructed v0.6.3 sources
+        run: |
+          rm -rf source-out
+          mkdir source-out
+          cp -a build-project/. source-out/
+          rm -rf source-out/.gradle source-out/app/build source-out/build
+          zip -qr Kurs_na_Horyzont_zrodla_v0.6.3.zip source-out
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Kurs_na_Horyzont_Realme_C67_v0.6.3
           path: build-project/Kurs_na_Horyzont_Realme_C67_v0.6.3.apk
+          if-no-files-found: error
+
+      - name: Upload reconstructed sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kurs_na_Horyzont_zrodla_v0.6.3
+          path: Kurs_na_Horyzont_zrodla_v0.6.3.zip
           if-no-files-found: error
