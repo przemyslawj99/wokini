@@ -1,4 +1,4 @@
-name: Build Kurs na Horyzont v0.6.3
+name: Export Kurs na Horyzont v0.6.3 source
 
 on:
   push:
@@ -6,29 +6,17 @@ on:
       - chatgpt-kurs-v060-build
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  export-source:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
+          fetch-depth: 0
 
       - name: Reconstruct v0.6.0 base
         run: |
@@ -46,36 +34,24 @@ jobs:
           cd build-project
           patch -p1 < ../v063.patch
 
-      - name: Build signed release APK
-        working-directory: build-project
-        run: gradle --no-daemon assembleRelease
-
-      - name: Verify APK metadata and signature
-        working-directory: build-project
+      - name: Export reconstructed source to branch
         run: |
-          APK=app/build/outputs/apk/release/app-release.apk
-          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 8
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"
-          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.3.apk
-
-      - name: Package reconstructed v0.6.3 sources
-        run: |
-          rm -rf source-out
-          mkdir source-out
-          cp -a build-project/. source-out/
-          rm -rf source-out/.gradle source-out/app/build source-out/build
-          zip -qr Kurs_na_Horyzont_zrodla_v0.6.3.zip source-out
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kurs_na_Horyzont_Realme_C67_v0.6.3
-          path: build-project/Kurs_na_Horyzont_Realme_C67_v0.6.3.apk
-          if-no-files-found: error
-
-      - name: Upload reconstructed sources
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kurs_na_Horyzont_zrodla_v0.6.3
-          path: Kurs_na_Horyzont_zrodla_v0.6.3.zip
-          if-no-files-found: error
+          rm -rf kurs-v063-src
+          mkdir -p kurs-v063-src/app/src/main/java/pl/kursnahoryzont/game
+          mkdir -p kurs-v063-src/app/src/main/res/drawable
+          cp build-project/settings.gradle kurs-v063-src/
+          cp build-project/build.gradle kurs-v063-src/
+          cp build-project/debug.keystore kurs-v063-src/
+          cp build-project/app/build.gradle kurs-v063-src/app/
+          cp build-project/app/src/main/AndroidManifest.xml kurs-v063-src/app/src/main/
+          cp build-project/app/src/main/java/pl/kursnahoryzont/game/*.java kurs-v063-src/app/src/main/java/pl/kursnahoryzont/game/
+          cp build-project/app/src/main/res/drawable/ic_launcher.xml kurs-v063-src/app/src/main/res/drawable/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kurs-v063-src
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "Export reconstructed v0.6.3 source [skip ci]"
+            git push origin HEAD:chatgpt-kurs-v060-build
+          fi
