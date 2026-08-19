@@ -1,4 +1,4 @@
-name: Build Kurs na Horyzont v0.6.5
+name: Build Kurs na Horyzont v0.6.6
 
 on:
   push:
@@ -20,13 +20,13 @@ jobs:
 
       - name: Record run id
         run: |
-          mkdir -p kurs-v065
-          printf '%s\n' "${{ github.run_id }}" > kurs-v065/latest_run.txt
+          mkdir -p kurs-v066
+          printf '%s\n' "${{ github.run_id }}" > kurs-v066/latest_run.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add kurs-v065/latest_run.txt
+          git add kurs-v066/latest_run.txt
           if ! git diff --cached --quiet; then
-            git commit -m "Record v0.6.5 build run [skip ci]"
+            git commit -m "Record v0.6.6 build run [skip ci]"
             git push origin HEAD:chatgpt-kurs-v060-build
           fi
 
@@ -61,8 +61,7 @@ jobs:
           patch -p1 < ../v063.patch
 
       - name: Apply v0.6.4 collision and model improvements
-        run: |
-          python3 kurs-v064/apply_v064.py
+        run: python3 kurs-v064/apply_v064.py
 
       - name: Apply v0.6.5 crew guns ports and islands patch
         run: |
@@ -72,9 +71,12 @@ jobs:
           sed -i 's#^--- kurs064/source-out/#--- a/#; s#^+++ kurs065/#+++ b/#' v065.patch
           cd build-project
           patch -p1 < ../v065.patch
-          grep -n "versionCode\|versionName" app/build.gradle
-          grep -n "CREW_HIRE_PRICE\|requiredCrew()\|fireBroadside()\|dockablePort()\|migrateWorldV3" app/src/main/java/pl/kursnahoryzont/game/GameState.java | head -n 50
-          grep -n "drawCrewOnDeck\|drawBroadsideMuzzleFlashes\|drawCannonProjectiles\|drawIsland" app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 50
+
+      - name: Apply v0.6.6 road and frigate water patch
+        run: |
+          python3 kurs-v066/apply_v066.py
+          grep -n "versionCode\|versionName" build-project/app/build.gradle
+          grep -n "wakeHullHalfLength\|wakeHullHalfBeam\|drawTerrainRoad" build-project/app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 30
 
       - name: Build signed release APK
         working-directory: build-project
@@ -87,63 +89,38 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 8 | tee apk_badging.txt
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK" | tee apk_signature.txt
           $ANDROID_HOME/build-tools/35.0.0/zipalign -c -v 4 "$APK" | tail -n 4 | tee zipalign.txt
-          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.5.apk
-          sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.5.apk | tee apk_sha256.txt
+          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
+          sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.6.apk | tee apk_sha256.txt
 
       - name: Create build report
         working-directory: build-project
         run: |
-          CERT=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs Kurs_na_Horyzont_Realme_C67_v0.6.5.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1)
-          SHA=$(sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.5.apk | awk '{print $1}')
-          cat > Kurs_na_Horyzont_v0.6.5_BUILD_REPORT.txt <<EOF
-          Kurs na Horyzont — v0.6.5 BUILD REPORT
-          versionName=0.6.5
-          versionCode=28
+          CERT=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs Kurs_na_Horyzont_Realme_C67_v0.6.6.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1)
+          SHA=$(sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.6.apk | awk '{print $1}')
+          cat > Kurs_na_Horyzont_v0.6.6_BUILD_REPORT.txt <<EOF
+          Kurs na Horyzont — v0.6.6 BUILD REPORT
+          versionName=0.6.6
+          versionCode=29
           package=pl.kursnahoryzont.game
           minSdkVersion=23
           targetSdkVersion=35
-          APK=Kurs_na_Horyzont_Realme_C67_v0.6.5.apk
+          APK=Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
           APK_SHA256=$SHA
 
-          Załoga:
-          - Dodano system załogi z zatrudnianiem i zwalnianiem w porcie.
-          - Cena zatrudnienia jednego członka załogi: 35 monet.
-          - Maksymalna liczba członków załogi: 18.
-          - Slup wymaga 1 członka załogi do pełnej obsługi żagli.
-          - Bryg wymaga 4 członków załogi do pełnej obsługi żagli.
-          - Fregata wymaga 8 członków załogi do pełnej obsługi żagli.
-          - Załoga obsługuje żagle, szoty, kotwicę, cumy i uzbrojenie zgodnie z wymaganiami statku.
-          - Brak wymaganej załogi zmniejsza skuteczność napędu żaglowego i blokuje czynności wymagające większej obsady.
-          - Załoga jest widoczna jako postacie na pokładzie oraz przy działach na pokładach działowych.
+          Poprawki wysp i dróg:
+          - Usunięto długie płaskie prostokąty drogi, które na pochyłym brzegu wisiały nad terenem.
+          - Drogi do kei są teraz zbudowane z krótkich segmentów dopasowanych do lokalnej wysokości i nachylenia terenu.
+          - Droga kończy się na lądzie przed linią wody, a dalsze dojście prowadzi po drewnianej kei.
+          - Drogi łączą dojście do kei z targiem i tawerną bez przecinania zatoki zawieszonym pasem piasku.
 
-          Działa:
-          - Dodano wybór lewej lub prawej burty.
-          - Dodano celowanie działami w zakresie od -12 do +12 stopni.
-          - Przyciski celowania zmieniają kąt o 3 stopnie.
-          - Dodano strzelanie salwą z aktywnej burty.
-          - Slup ma 2 działa na każdej burcie.
-          - Bryg ma 4 działa na każdej burcie.
-          - Fregata ma 7 dział na każdej burcie.
-          - Pociski dział są renderowane w świecie i po uderzeniu w morze generują rozbryzg.
-          - Dodano błysk i dym przy lufach podczas salwy.
-          - Bazowy czas przeładowania: slup 5.2 s, bryg 7.0 s, fregata 8.5 s; liczniejsza załoga skraca czas przeładowania.
-
-          Cumowanie:
-          - Powiększono strefę wykrywania portu podczas cumowania do promienia wyspy plus 55 jednostek świata.
-          - Maksymalna prędkość przy próbie cumowania wynosi 0.68 jednostki symulacji.
-          - Po udanym cumowaniu statek automatycznie ustawia się przy właściwej stronie kei.
-          - Cumowanie wymaga 1 członka załogi na slupie, 2 na brygu i 3 na fregacie.
-          - Zwiększono zasięg wejścia na statek z lądu przy kei.
-
-          Wyspy i porty:
-          - Nowe położenia portów X: 0, -620, 860.
-          - Nowe położenia portów Z: -35, 980, 320.
-          - Promienie wysp: 58, 72, 66 jednostek świata.
-          - Wyspy zostały odsunięte od siebie i powiększone.
-          - Każdy port dostał większą keję, falochrony, więcej pali kei i większy obszar portowy.
-          - Dodano większy targ, tawernę, stocznię z żurawiem, większy magazyn, drogi, domy i rozbudowaną latarnię.
-          - Liczba drzew zależy od jakości grafiki: 16 / 24 / 32.
-          - Dodano migrację starych zapisów do nowego układu świata i zabezpieczenie przed startem statku wewnątrz powiększonej wyspy.
+          Poprawki wody przy statkach:
+          - Kilwater korzysta teraz z rzeczywistej długości i szerokości aktualnego statku.
+          - Dla fregaty kilwater zaczyna się za rzeczywistą rufą zamiast wewnątrz długiego kadłuba.
+          - Fala dziobowa jest ustawiana przy rzeczywistym dziobie slupa, brygu i fregaty.
+          - Dodano dłuższe grzbiety piany odrzucanej od dziobu na obie burty.
+          - Fregata ma mocniejszą pianę i rozbryzg niż mniejsze jednostki.
+          - Liczba segmentów piany nadal zależy od ustawionej jakości grafiki.
+          - Kilwater i fala dziobowa są renderowane tylko podczas ruchu statku; przy prędkości 0 nie są wyświetlane.
 
           Build i podpis:
           - Gradle assembleRelease: BUILD SUCCESSFUL.
@@ -153,7 +130,7 @@ jobs:
           - Certyfikat SHA-256=$CERT
           - Test na fizycznym Realme C67 nie został wykonany w środowisku buildowym.
           EOF
-          sed -i 's/^          //' Kurs_na_Horyzont_v0.6.5_BUILD_REPORT.txt
+          sed -i 's/^          //' Kurs_na_Horyzont_v0.6.6_BUILD_REPORT.txt
 
       - name: Package sources
         run: |
@@ -161,21 +138,21 @@ jobs:
           mkdir source-out
           cp -a build-project/. source-out/
           rm -rf source-out/.gradle source-out/app/build source-out/build
-          rm -f source-out/Kurs_na_Horyzont_Realme_C67_v0.6.5.apk
-          zip -qr Kurs_na_Horyzont_zrodla_v0.6.5.zip source-out
+          rm -f source-out/Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
+          zip -qr Kurs_na_Horyzont_zrodla_v0.6.6.zip source-out
 
       - name: Upload APK and report
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_Realme_C67_v0.6.5
+          name: Kurs_na_Horyzont_Realme_C67_v0.6.6
           path: |
-            build-project/Kurs_na_Horyzont_Realme_C67_v0.6.5.apk
-            build-project/Kurs_na_Horyzont_v0.6.5_BUILD_REPORT.txt
+            build-project/Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
+            build-project/Kurs_na_Horyzont_v0.6.6_BUILD_REPORT.txt
           if-no-files-found: error
 
       - name: Upload sources
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_zrodla_v0.6.5
-          path: Kurs_na_Horyzont_zrodla_v0.6.5.zip
+          name: Kurs_na_Horyzont_zrodla_v0.6.6
+          path: Kurs_na_Horyzont_zrodla_v0.6.6.zip
           if-no-files-found: error
