@@ -1,9 +1,9 @@
-name: Build Kurs na Horyzont v0.6.6
+name: Build Kurs na Horyzont v0.6.7
 
 on:
   push:
     branches:
-      - chatgpt-kurs-v060-build
+      - chatgpt-kurs-v067-build
   workflow_dispatch:
 
 permissions:
@@ -20,14 +20,14 @@ jobs:
 
       - name: Record run id
         run: |
-          mkdir -p kurs-v066
-          printf '%s\n' "${{ github.run_id }}" > kurs-v066/latest_run.txt
+          mkdir -p kurs-v067
+          printf '%s\n' "${{ github.run_id }}" > kurs-v067/latest_run.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add kurs-v066/latest_run.txt
+          git add kurs-v067/latest_run.txt
           if ! git diff --cached --quiet; then
-            git commit -m "Record v0.6.6 build run [skip ci]"
-            git push origin HEAD:chatgpt-kurs-v060-build
+            git commit -m "Record v0.6.7 build run [skip ci]"
+            git push origin HEAD:chatgpt-kurs-v067-build
           fi
 
       - name: Setup Java 17
@@ -73,10 +73,18 @@ jobs:
           patch -p1 < ../v065.patch
 
       - name: Apply v0.6.6 road and frigate water patch
+        run: python3 kurs-v066/apply_v066.py
+
+      - name: Apply v0.6.7 period sloop remodel
         run: |
-          python3 kurs-v066/apply_v066.py
-          grep -n "versionCode\|versionName" build-project/app/build.gradle
-          grep -n "wakeHullHalfLength\|wakeHullHalfBeam\|drawTerrainRoad" build-project/app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 30
+          cat kurs-v067/patch/chunk_* > v067.patch.gz.b64
+          base64 -d v067.patch.gz.b64 > v067.patch.gz
+          gzip -dc v067.patch.gz > v067.patch
+          sed -i 's#^--- v066/source-out/#--- a/#; s#^+++ v067/#+++ b/#' v067.patch
+          cd build-project
+          patch -p1 < ../v067.patch
+          grep -n "versionCode\|versionName" app/build.gradle
+          grep -n "detailedHull\|drawSloopRig\|drawSloopHoldInterior\|drawRailings" app/src/main/java/pl/kursnahoryzont/game/ShipGeometry.java app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java | head -n 40
 
       - name: Build signed release APK
         working-directory: build-project
@@ -89,38 +97,35 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 8 | tee apk_badging.txt
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK" | tee apk_signature.txt
           $ANDROID_HOME/build-tools/35.0.0/zipalign -c -v 4 "$APK" | tail -n 4 | tee zipalign.txt
-          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
-          sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.6.apk | tee apk_sha256.txt
+          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.7.apk
+          sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.7.apk | tee apk_sha256.txt
 
       - name: Create build report
         working-directory: build-project
         run: |
-          CERT=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs Kurs_na_Horyzont_Realme_C67_v0.6.6.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1)
-          SHA=$(sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.6.apk | awk '{print $1}')
-          cat > Kurs_na_Horyzont_v0.6.6_BUILD_REPORT.txt <<EOF
-          Kurs na Horyzont — v0.6.6 BUILD REPORT
-          versionName=0.6.6
-          versionCode=29
+          CERT=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs Kurs_na_Horyzont_Realme_C67_v0.6.7.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1)
+          SHA=$(sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.7.apk | awk '{print $1}')
+          cat > Kurs_na_Horyzont_v0.6.7_BUILD_REPORT.txt <<EOF
+          Kurs na Horyzont — v0.6.7 BUILD REPORT
+          versionName=0.6.7
+          versionCode=30
           package=pl.kursnahoryzont.game
           minSdkVersion=23
           targetSdkVersion=35
-          APK=Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
+          APK=Kurs_na_Horyzont_Realme_C67_v0.6.7.apk
           APK_SHA256=$SHA
 
-          Poprawki wysp i dróg:
-          - Usunięto długie płaskie prostokąty drogi, które na pochyłym brzegu wisiały nad terenem.
-          - Drogi do kei są teraz zbudowane z krótkich segmentów dopasowanych do lokalnej wysokości i nachylenia terenu.
-          - Droga kończy się na lądzie przed linią wody, a dalsze dojście prowadzi po drewnianej kei.
-          - Drogi łączą dojście do kei z targiem i tawerną bez przecinania zatoki zawieszonym pasem piasku.
-
-          Poprawki wody przy statkach:
-          - Kilwater korzysta teraz z rzeczywistej długości i szerokości aktualnego statku.
-          - Dla fregaty kilwater zaczyna się za rzeczywistą rufą zamiast wewnątrz długiego kadłuba.
-          - Fala dziobowa jest ustawiana przy rzeczywistym dziobie slupa, brygu i fregaty.
-          - Dodano dłuższe grzbiety piany odrzucanej od dziobu na obie burty.
-          - Fregata ma mocniejszą pianę i rozbryzg niż mniejsze jednostki.
-          - Liczba segmentów piany nadal zależy od ustawionej jakości grafiki.
-          - Kilwater i fala dziobowa są renderowane tylko podczas ruchu statku; przy prędkości 0 nie są wyświetlane.
+          Przebudowa slupa:
+          - Kadlub slupa przebudowano od podstaw na szerszy i glebszy ksztalt z pelniejsza rufa i ostrzejszym dziobem.
+          - Dodano podniesiony poklad rufowy i dziobowy, schodki oraz nowe relingi dopasowane do wysokosci pokladow.
+          - Dodano bukszpryt z wantami dziobowymi, nowa stewe, pasy burtowe, rufowa galerie i okna.
+          - Slup ma trzy lekkie dziala na kazdej burcie ustawione przy furtach dzialowych.
+          - Jednomasztowy takielunek dostal topmaszt, platforme, gafel, sztag, wanty, drabinki sznurowe i dodatkowe olinowanie stale.
+          - Fok zostal przesuniety na dluzszy sztag do nowego bukszprytu; przednia krawedz pozostaje zamocowana do sztagu.
+          - Przebudowano kabine rufowa, centralny luk i wyposazenie pokladu.
+          - Pod pokladem znajduje sie wspolny poklad dzialowo-ladunkowy z centralnym przejsciem, kojami rufowymi, stolem i ladunkiem.
+          - Kolizje pokladu i wnetrza dopasowano do nowego kadluba, dzial, kabiny, masztu oraz skrajnych czesci pokladu.
+          - Pozycja kola sterowego i wysokosc kamery zostaly dopasowane do podniesionego pokladu rufowego.
 
           Build i podpis:
           - Gradle assembleRelease: BUILD SUCCESSFUL.
@@ -128,9 +133,9 @@ jobs:
           - APK v2 signature=true.
           - zipalign=OK.
           - Certyfikat SHA-256=$CERT
-          - Test na fizycznym Realme C67 nie został wykonany w środowisku buildowym.
+          - Test na fizycznym Realme C67 nie zostal wykonany w srodowisku buildowym.
           EOF
-          sed -i 's/^          //' Kurs_na_Horyzont_v0.6.6_BUILD_REPORT.txt
+          sed -i 's/^          //' Kurs_na_Horyzont_v0.6.7_BUILD_REPORT.txt
 
       - name: Package sources
         run: |
@@ -138,21 +143,21 @@ jobs:
           mkdir source-out
           cp -a build-project/. source-out/
           rm -rf source-out/.gradle source-out/app/build source-out/build
-          rm -f source-out/Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
-          zip -qr Kurs_na_Horyzont_zrodla_v0.6.6.zip source-out
+          rm -f source-out/Kurs_na_Horyzont_Realme_C67_v0.6.7.apk
+          zip -qr Kurs_na_Horyzont_zrodla_v0.6.7.zip source-out
 
       - name: Upload APK and report
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_Realme_C67_v0.6.6
+          name: Kurs_na_Horyzont_Realme_C67_v0.6.7
           path: |
-            build-project/Kurs_na_Horyzont_Realme_C67_v0.6.6.apk
-            build-project/Kurs_na_Horyzont_v0.6.6_BUILD_REPORT.txt
+            build-project/Kurs_na_Horyzont_Realme_C67_v0.6.7.apk
+            build-project/Kurs_na_Horyzont_v0.6.7_BUILD_REPORT.txt
           if-no-files-found: error
 
       - name: Upload sources
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_zrodla_v0.6.6
-          path: Kurs_na_Horyzont_zrodla_v0.6.6.zip
+          name: Kurs_na_Horyzont_zrodla_v0.6.7
+          path: Kurs_na_Horyzont_zrodla_v0.6.7.zip
           if-no-files-found: error
