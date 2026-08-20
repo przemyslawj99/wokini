@@ -1,0 +1,133 @@
+name: Build Kurs na Horyzont v0.6.8 FINAL
+
+on:
+  push:
+    branches:
+      - chatgpt-kurs-v068-apk
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Record run id
+        run: |
+          mkdir -p kurs-v068
+          printf '%s\n' "${{ github.run_id }}" > kurs-v068/latest_run.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kurs-v068/latest_run.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Record v0.6.8 build run [skip ci]"
+            git push origin HEAD:chatgpt-kurs-v068-apk
+          fi
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Reconstruct source through v0.6.6
+        run: |
+          cat kurs-v060/chunks/chunk_* > project.b64
+          base64 -d project.b64 > project.zip
+          rm -rf build-project
+          mkdir build-project
+          unzip -q project.zip -d build-project
+          cat kurs-v060/v063-patch/chunk_* > v063.patch.gz.b64
+          base64 -d v063.patch.gz.b64 > v063.patch.gz
+          gzip -dc v063.patch.gz > v063.patch
+          cd build-project
+          patch -p1 < ../v063.patch
+          cd ..
+          python3 kurs-v064/apply_v064.py
+          cat kurs-v065/patch/chunk_* > v065.patch.gz.b64
+          base64 -d v065.patch.gz.b64 > v065.patch.gz
+          gzip -dc v065.patch.gz > v065.patch
+          sed -i 's#^--- kurs064/source-out/#--- a/#; s#^+++ kurs065/#+++ b/#' v065.patch
+          cd build-project
+          patch -p1 < ../v065.patch
+          cd ..
+          python3 kurs-v066/apply_v066.py
+
+      - name: Apply v0.6.8 remodeled ships
+        run: |
+          cat kurs-v068/patch/chunk_00 kurs-v068/patch/part_00 kurs-v068/patch/part_01 kurs-v068/patch/part_02 > v068.patch.gz.b64
+          base64 -d v068.patch.gz.b64 > v068.patch.gz
+          gzip -dc v068.patch.gz > v068.patch
+          sed -i 's#^--- /tmp/patchbase/#--- a/#; s#^+++ /tmp/patchnew/#+++ b/#' v068.patch
+          cd build-project
+          patch -p1 < ../v068.patch
+          sed -i -E 's/android:versionCode="[0-9]+"/android:versionCode="31"/; s/android:versionName="[^"]+"/android:versionName="0.6.8"/' app/src/main/AndroidManifest.xml
+          grep -n "versionCode\|versionName" app/build.gradle app/src/main/AndroidManifest.xml
+
+      - name: Build release APK
+        working-directory: build-project
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify and name APK
+        working-directory: build-project
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 8 | tee apk_badging.txt
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK" | tee apk_signature.txt
+          $ANDROID_HOME/build-tools/35.0.0/zipalign -c -v 4 "$APK" | tail -n 4 | tee zipalign.txt
+          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.6.8.apk
+          sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.8.apk | tee apk_sha256.txt
+
+      - name: Create report
+        working-directory: build-project
+        run: |
+          CERT=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs Kurs_na_Horyzont_Realme_C67_v0.6.8.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1)
+          SHA=$(sha256sum Kurs_na_Horyzont_Realme_C67_v0.6.8.apk | awk '{print $1}')
+          V1=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose Kurs_na_Horyzont_Realme_C67_v0.6.8.apk | sed -n 's/Verified using v1 scheme (JAR signing): //p' | head -n1)
+          V2=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose Kurs_na_Horyzont_Realme_C67_v0.6.8.apk | sed -n 's/Verified using v2 scheme (APK Signature Scheme v2): //p' | head -n1)
+          cat > Kurs_na_Horyzont_v0.6.8_BUILD_REPORT.txt <<EOF
+          Kurs na Horyzont — v0.6.8 BUILD REPORT
+          versionName=0.6.8
+          versionCode=31
+          package=pl.kursnahoryzont.game
+          minSdkVersion=23
+          targetSdkVersion=35
+          APK=Kurs_na_Horyzont_Realme_C67_v0.6.8.apk
+          APK_SHA256=$SHA
+          CERT_SHA256=$CERT
+          APK_V1=$V1
+          APK_V2=$V2
+          ZIPALIGN=OK
+          BRYG=przebudowany kadlub, poklady, rufa, dziob, relingi, furty dzialowe i takielunek
+          FREGATA=przebudowany dluzszy i glebszy kadlub, galerie rufowe, beakhead, poklady, furty i takielunek trzech masztow
+          KOLIZJE=dopasowane do nowych wymiarow brygu i fregaty
+          Gradle assembleRelease=BUILD SUCCESSFUL
+          Fizyczny test Realme C67=NIE WYKONANO W SRODOWISKU BUILDOWYM
+          EOF
+          sed -i 's/^          //' Kurs_na_Horyzont_v0.6.8_BUILD_REPORT.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kurs_na_Horyzont_Realme_C67_v0.6.8
+          path: |
+            build-project/Kurs_na_Horyzont_Realme_C67_v0.6.8.apk
+            build-project/Kurs_na_Horyzont_v0.6.8_BUILD_REPORT.txt
+          if-no-files-found: error
