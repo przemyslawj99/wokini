@@ -74,9 +74,8 @@ jobs:
 
       - name: Apply v0.7.1 hull and camera patch
         run: |
-          base64 -d kurs-v071/v071_patch.gz.b64 | gunzip > /tmp/v071.patch
           cd build-project
-          patch -p1 < /tmp/v071.patch
+          patch -p1 < ../kurs-v071/v071.patch
           grep -n "versionCode\|versionName" app/build.gradle
 
       - name: Build signed release APK
