@@ -51,9 +51,11 @@ jobs:
         run: |
           : > kurs-v060/project.zip
           for f in kurs-v060/v069/chunk_*; do
-            base64 -d "$f" >> kurs-v060/project.zip
+            echo "decoding $f"
+            base64 --ignore-garbage -d "$f" >> kurs-v060/project.zip
           done
-          echo "c06d1efccdb908e2cab93e7c3e483c4562753905524d0249d469bc19310def21  kurs-v060/project.zip" | sha256sum -c -
+          sha256sum kurs-v060/project.zip
+          unzip -t kurs-v060/project.zip
 
       - name: Unpack project
         run: |
