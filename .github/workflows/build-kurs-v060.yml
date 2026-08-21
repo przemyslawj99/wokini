@@ -1,4 +1,4 @@
-name: Build Kurs na Horyzont v0.7.0
+name: Build Kurs na Horyzont v0.7.1
 
 on:
   push:
@@ -20,13 +20,13 @@ jobs:
 
       - name: Record run id
         run: |
-          mkdir -p kurs-v070
-          printf '%s\n' "${{ github.run_id }}" > kurs-v070/latest_run.txt
+          mkdir -p kurs-v071
+          printf '%s\n' "${{ github.run_id }}" > kurs-v071/latest_run.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add kurs-v070/latest_run.txt
+          git add kurs-v071/latest_run.txt
           if ! git diff --cached --quiet; then
-            git commit -m "Record v0.7.0 build run [skip ci]"
+            git commit -m "Record v0.7.1 build run [skip ci]"
             git push origin HEAD:chatgpt-kurs-v060-build
           fi
 
@@ -71,6 +71,12 @@ jobs:
           base64 -d kurs-v070/v070_patch.gz.b64 | gunzip > /tmp/v070.patch
           cd build-project
           patch -p1 < /tmp/v070.patch
+
+      - name: Apply v0.7.1 hull and camera patch
+        run: |
+          base64 -d kurs-v071/v071_patch.gz.b64 | gunzip > /tmp/v071.patch
+          cd build-project
+          patch -p1 < /tmp/v071.patch
           grep -n "versionCode\|versionName" app/build.gradle
 
       - name: Build signed release APK
@@ -85,37 +91,32 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK" | tee apk_signature.txt
           $ANDROID_HOME/build-tools/35.0.0/zipalign -c -v 4 "$APK" | tee zipalign.txt
           sha256sum "$APK" | tee apk_sha256.txt
-          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.7.0.apk
+          cp "$APK" Kurs_na_Horyzont_Realme_C67_v0.7.1.apk
 
       - name: Create build report
         working-directory: build-project
         run: |
           SHA=$(cut -d' ' -f1 apk_sha256.txt)
           CERT=$(grep -m1 'Signer #1 certificate SHA-256 digest:' apk_signature.txt | sed 's/.*: //')
-          cat > Kurs_na_Horyzont_v0.7.0_BUILD_REPORT.txt <<EOF
-          Kurs na Horyzont — v0.7.0 BUILD REPORT
-          versionName=0.7.0
-          versionCode=34
+          cat > Kurs_na_Horyzont_v0.7.1_BUILD_REPORT.txt <<EOF
+          Kurs na Horyzont — v0.7.1 BUILD REPORT
+          versionName=0.7.1
+          versionCode=35
           package=pl.kursnahoryzont.game
           minSdkVersion=23
           targetSdkVersion=35
-          APK=Kurs_na_Horyzont_Realme_C67_v0.7.0.apk
+          APK=Kurs_na_Horyzont_Realme_C67_v0.7.1.apk
           APK_SHA256=$SHA
 
-          Prawdziwa załoga:
-          - Każdy marynarz NPC ma aktualne zadanie zamiast stać w jednym punkcie.
-          - Załoga zajmuje stanowiska przy sterze, żaglach, kotwicy, cumach i działach.
-          - Marynarze przemieszczają się wizualnie pomiędzy stanowiskami na pokładzie.
-          - Sternik przejmuje wachtę przy kole, kiedy kapitan nie stoi za sterem i jest wolny marynarz.
-          - Rozkazy stawiania i zrzucania żagli nie wykonują się natychmiast; załoga musi dojść do stanowisk i wykonać pracę.
-          - Regulacja szotów przez rozkaz za sterem ma czas wykonania zależny od klasy statku.
-          - Kotwica i cumowanie dostały pracę zespołową oraz czas wykonania.
-          - Obsługa dział przechodzi na pokład działowy, zajmuje stanowiska, strzela po przygotowaniu i zostaje przy działach na czas przeładowania.
-          - Przeładowanie dział postępuje tylko wtedy, gdy przy danej burcie są przydzieleni artylerzyści.
-          - Możliwe jest jednoczesne przydzielanie ludzi do różnych zadań, jeśli pozostają wolni marynarze.
-          - HUD pokazuje wolnych ludzi, bieżący rozkaz i podział załogi między żagle, działa, pokład i ster.
-          - Ręczna obsługa fału i szotów z pokładu pozostaje dostępna dla gry solo slupem.
-          - Animacje rąk i chodu różnią się zależnie od wykonywanego zadania.
+          Poprawki modeli i widoku 3 osoby:
+          - Domknięto boczne ściany pod podniesionym quarterdeckiem fregaty od rufy do schodów.
+          - Domknięto boczne ściany forecastle fregaty aż do części dziobowej.
+          - Dodano wewnętrzne powierzchnie osłonowe przy quarterdecku fregaty, aby kamera nie widziała przez jednostronne powierzchnie modelu.
+          - Analogicznie domknięto podniesione pokłady brygu, aby ten sam błąd nie pojawił się na średnim statku.
+          - Kamera 3 osoby ma teraz osobny dystans dla slupa, brygu i fregaty.
+          - Dystans kamery fregaty zwiększono tak, aby kamera pozostawała poza rufą i burtami podczas obrotu.
+          - Wysokość i punkt celowania kamery 3 osoby są zależne od klasy statku i wysokości jego pokładów.
+          - Zachowano system prawdziwej załogi z v0.7.0.
 
           Build i podpis:
           - Gradle assembleRelease: BUILD SUCCESSFUL.
@@ -133,25 +134,25 @@ jobs:
           cp -a build-project/. source-package/
           rm -rf source-package/app/build source-package/.gradle source-package/build
           cd source-package
-          zip -qr ../Kurs_na_Horyzont_zrodla_v0.7.0.zip .
+          zip -qr ../Kurs_na_Horyzont_zrodla_v0.7.1.zip .
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_Realme_C67_v0.7.0
-          path: build-project/Kurs_na_Horyzont_Realme_C67_v0.7.0.apk
+          name: Kurs_na_Horyzont_Realme_C67_v0.7.1
+          path: build-project/Kurs_na_Horyzont_Realme_C67_v0.7.1.apk
           if-no-files-found: error
 
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_v0.7.0_BUILD_REPORT
-          path: build-project/Kurs_na_Horyzont_v0.7.0_BUILD_REPORT.txt
+          name: Kurs_na_Horyzont_v0.7.1_BUILD_REPORT
+          path: build-project/Kurs_na_Horyzont_v0.7.1_BUILD_REPORT.txt
           if-no-files-found: error
 
       - name: Upload sources
         uses: actions/upload-artifact@v4
         with:
-          name: Kurs_na_Horyzont_zrodla_v0.7.0
-          path: Kurs_na_Horyzont_zrodla_v0.7.0.zip
+          name: Kurs_na_Horyzont_zrodla_v0.7.1
+          path: Kurs_na_Horyzont_zrodla_v0.7.1.zip
           if-no-files-found: error
