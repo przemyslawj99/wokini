@@ -1,0 +1,86 @@
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -10,8 +10,8 @@
+         applicationId 'pl.kursnahoryzont.game'
+         minSdk 23
+         targetSdk 35
+-        versionCode 34
+-        versionName '0.7.0'
++        versionCode 35
++        versionName '0.7.1'
+     }
+ 
+     signingConfigs {
+--- a/app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java
++++ b/app/src/main/java/pl/kursnahoryzont/game/WorldRenderer.java
+@@ -215,12 +215,21 @@
+             yaw = state.lookYaw;
+         } else if (state.atHelm && state.helmThirdPerson) {
+             float orbit = state.shipHeading + state.lookYaw;
+-            float cameraDistance = 13.5f * state.shipScaleZ();
++            // v0.7.1: the old fixed 13.5 unit orbit sat almost on the frigate transom
++            // (the authored hull is over 26 units long), so rotating the camera could enter
++            // the quarterdeck shell and expose open backfaces. Keep each class clearly outside
++            // its hull and raise the camera with the real deck height.
++            float cameraDistance = state.shipType == GameState.SHIP_FRIGATE ? 23.5f
++                    : (state.shipType == GameState.SHIP_BRIG ? 18.5f : 14.5f);
++            float cameraBaseY = state.shipType == GameState.SHIP_FRIGATE ? 9.2f
++                    : (state.shipType == GameState.SHIP_BRIG ? 7.4f : 6.4f);
++            float targetY = state.shipType == GameState.SHIP_FRIGATE ? 3.35f
++                    : (state.shipType == GameState.SHIP_BRIG ? 2.55f : 1.8f);
+             eyeX = state.shipX - (float)Math.sin(orbit) * cameraDistance;
+             eyeZ = state.shipZ - (float)Math.cos(orbit) * cameraDistance;
+-            eyeY = 6.4f * state.shipScaleY() + wave + (float)Math.sin(state.lookPitch) * 3.0f;
++            eyeY = cameraBaseY + wave + (float)Math.sin(state.lookPitch) * 3.4f;
+             Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ,
+-                    state.shipX, 1.8f * state.shipScaleY() + wave, state.shipZ,
++                    state.shipX, targetY + wave, state.shipZ,
+                     (float)Math.sin(cameraRoll), (float)Math.cos(cameraRoll), 0f);
+             Matrix.multiplyMM(vp, 0, projection, 0, view, 0);
+             return;
+@@ -984,6 +993,26 @@
+         drawBox(shipMatrix, 0f, 3.46f, 11.76f, 2.18f, 0.24f, 0.86f, BROWN);
+         drawBox(shipMatrix, 0f, 3.59f, 11.76f, 2.02f, 0.08f, 0.76f, WOOD);
+ 
++        // v0.7.1: close the raised-deck side shells. The hull sheer ends below the
++        // quarterdeck/forecastle, so without these faces third-person view can see ocean
++        // straight through the ship. Panels overlap section joins to eliminate hairline gaps.
++        for (float side : new float[]{-1f, 1f}) {
++            // Quarterdeck sides from stern to the stair break.
++            drawBox(shipMatrix, side * 2.78f, 3.47f, -11.10f, 0.18f, 1.34f, 2.66f, BROWN);
++            drawBox(shipMatrix, side * 3.27f, 3.50f, -8.65f, 0.18f, 1.28f, 2.66f, BROWN);
++            drawBox(shipMatrix, side * 3.50f, 3.53f, -6.55f, 0.18f, 1.22f, 1.88f, BROWN);
++            // Inner backing faces prevent a camera grazing the rail from seeing backface holes.
++            drawBox(shipMatrix, side * 2.60f, 3.45f, -11.10f, 0.08f, 1.24f, 2.62f, WOOD);
++            drawBox(shipMatrix, side * 3.09f, 3.47f, -8.65f, 0.08f, 1.18f, 2.62f, WOOD);
++            drawBox(shipMatrix, side * 3.32f, 3.50f, -6.55f, 0.08f, 1.12f, 1.84f, WOOD);
++
++            // Forecastle sides, tapered toward the beakhead.
++            drawBox(shipMatrix, side * 3.18f, 3.16f, 8.20f, 0.16f, 0.82f, 1.66f, BROWN);
++            drawBox(shipMatrix, side * 2.60f, 3.18f, 9.55f, 0.16f, 0.78f, 1.52f, BROWN);
++            drawBox(shipMatrix, side * 1.82f, 3.18f, 10.78f, 0.14f, 0.74f, 1.28f, BROWN);
++            drawBox(shipMatrix, side * 1.00f, 3.05f, 11.76f, 0.12f, 0.60f, 0.94f, BROWN);
++        }
++
+         // Close the vertical faces at both deck transitions but keep a central stair opening.
+         for (float side : new float[]{-1f, 1f}) {
+             drawBox(shipMatrix, side * 2.55f, 3.44f, -5.73f, 2.05f, 1.40f, 0.18f, BROWN);
+@@ -1235,6 +1264,18 @@
+         drawBox(shipMatrix, 0f, 2.64f, 8.72f, 1.72f, 0.22f, 0.68f, BROWN);
+         drawBox(shipMatrix, 0f, 2.77f, 8.72f, 1.56f, 0.08f, 0.58f, WOOD);
+ 
++        // v0.7.1: the brig uses the same raised-deck construction, so close its side
++        // shells as well before it develops the same third-person see-through gap.
++        for (float side : new float[]{-1f, 1f}) {
++            drawBox(shipMatrix, side * 2.34f, 2.63f, -8.30f, 0.16f, 1.02f, 1.92f, BROWN);
++            drawBox(shipMatrix, side * 2.74f, 2.67f, -6.85f, 0.16f, 0.96f, 1.56f, BROWN);
++            drawBox(shipMatrix, side * 2.88f, 2.69f, -5.65f, 0.16f, 0.90f, 1.20f, BROWN);
++            drawBox(shipMatrix, side * 2.48f, 2.42f, 5.90f, 0.14f, 0.70f, 1.42f, BROWN);
++            drawBox(shipMatrix, side * 1.98f, 2.43f, 7.03f, 0.14f, 0.66f, 1.20f, BROWN);
++            drawBox(shipMatrix, side * 1.36f, 2.40f, 7.96f, 0.12f, 0.58f, 1.00f, BROWN);
++            drawBox(shipMatrix, side * 0.72f, 2.28f, 8.72f, 0.10f, 0.46f, 0.78f, BROWN);
++        }
++
+         for (float side : new float[]{-1f, 1f}) {
+             drawBox(shipMatrix, side * 2.05f, 2.62f, -5.02f, 1.60f, 1.05f, 0.16f, BROWN);
+             drawBox(shipMatrix, side * 1.82f, 2.42f, 5.30f, 1.40f, 0.68f, 0.16f, BROWN);
