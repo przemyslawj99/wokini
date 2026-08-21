@@ -50,11 +50,15 @@ jobs:
       - name: Reconstruct project archive
         run: |
           : > kurs-v060/project.zip
-          for f in kurs-v060/v069/chunk_*; do
-            echo "decoding $f"
-            base64 --ignore-garbage -d "$f" >> kurs-v060/project.zip
+          for f in kurs-v060/v069/chunk_00 kurs-v060/v069/chunk_01 kurs-v060/v069/chunk_02 kurs-v060/v069/chunk_03 kurs-v060/v069/chunk_04 kurs-v060/v069/chunk_05; do
+            base64 -d "$f" >> kurs-v060/project.zip
           done
+          head -c 5000 kurs-v060/v069/chunk_06a | base64 -d >> kurs-v060/project.zip
+          base64 -d kurs-v060/v069/chunk_06b >> kurs-v060/project.zip
+          base64 -d kurs-v060/v069/chunk_07a >> kurs-v060/project.zip
+          base64 -d kurs-v060/v069/chunk_07b >> kurs-v060/project.zip
           sha256sum kurs-v060/project.zip
+          echo "c06d1efccdb908e2cab93e7c3e483c4562753905524d0249d469bc19310def21  kurs-v060/project.zip" | sha256sum -c -
           unzip -t kurs-v060/project.zip
 
       - name: Unpack project
